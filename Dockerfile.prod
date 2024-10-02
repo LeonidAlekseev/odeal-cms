@@ -1,4 +1,4 @@
-FROM node:20-alpine as build
+FROM node:18-alpine as build
 RUN apk add --no-cache build-base gcc autoconf automake libpng-dev vips-dev git g++ \
 && export CXX=g++ \
 && export CC=gcc \
@@ -20,7 +20,7 @@ COPY . .
 RUN yarn build
 
 
-FROM node:20-alpine
+FROM node:18-alpine
 RUN apk add --no-cache vips-dev
 ENV NODE_ENV=production
 WORKDIR /opt/
