@@ -20,4 +20,15 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nodejs
+
+RUN chown -R nodejs:nodejs /app
+
+USER nodejs
+
+EXPOSE 1337
+
+ENV PORT=1337
+
 CMD ["npm", "run", "develop"]

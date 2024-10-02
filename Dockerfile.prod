@@ -1,35 +1,45 @@
-FROM node:18-alpine as build
-RUN apk add --no-cache build-base gcc autoconf automake libpng-dev vips-dev git g++ \
-&& export CXX=g++ \
-&& export CC=gcc \
-&& export CXXFLAGS=“-std=c++11” \
-&& export CFLAGS=“-std=c++11”
+FROM node:18-alpine AS base
 
-ENV NODE_ENV=${NODE_ENV}
-ENV SHARP_IGNORE_GLOBAL_LIBVIPS=1
+# Install dependencies only when needed
+FROM base AS deps
+# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
 
-WORKDIR /opt/
-COPY package.json yarn.lock ./
-RUN yarn global add node-gyp
-RUN yarn install --production --ignore-scripts --network-timeout 600000 && yarn add sharp
-RUN yarn cache clean
+# Install dependencies based on the preferred package manager
+COPY package.json package-lock.json* ./
+RUN \
+  if [ -f package-lock.json ]; then npm ci; \
+  elif [ -f package.json ]; then npm i; \
+  else echo "Package not found." && exit 1; \
+  fi
 
-ENV PATH /opt/node_modules/.bin:$PATH
-WORKDIR /opt/app
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN yarn build
 
+RUN npm run build
 
-FROM node:18-alpine
-RUN apk add --no-cache vips-dev
-ENV NODE_ENV=production
-WORKDIR /opt/
-COPY --from=build /opt/node_modules ./node_modules
-WORKDIR /opt/app
-COPY --from=build /opt/app ./
-ENV PATH /opt/node_modules/.bin:$PATH
+# Production image, copy all the files and run next
+FROM base AS runner
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 
-RUN chown -R node:node /opt/app
-USER node
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nodejs
+
+RUN chown -R nodejs:nodejs /app
+
+USER nodejs
+
 EXPOSE 1337
-CMD [“yarn”, “start”]
+
+ENV PORT=1337
+
+# server.js is created by next build from the standalone output
+# https://nodejs.org/docs/pages/api-reference/next-config-js/output
+ENV HOSTNAME="0.0.0.0"
+CMD ["node", "server.js"]
