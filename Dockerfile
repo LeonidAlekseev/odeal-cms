@@ -20,6 +20,12 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# ENV ADMIN_PATH=admin
+# ENV STRAPI_ADMIN_BACKEND_URL=https://localhost
+
+# Uncomment the following line in case you want to disable telemetry during runtime.
+# ENV STRAPI_TELEMETRY_DISABLED=1
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nodejs
 
